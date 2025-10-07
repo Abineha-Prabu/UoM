@@ -1,0 +1,8 @@
+from pathlib import Path
+import sqlite3
+import pandas as pd
+
+DB = Path("workshop2.db")
+with sqlite3.connect(DB) as conn:
+    df = pd.read_sql_query("SELECT * FROM trip LIMIT 20;", conn)
+df.head()

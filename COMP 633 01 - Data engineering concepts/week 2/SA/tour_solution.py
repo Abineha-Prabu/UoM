@@ -44,50 +44,66 @@ class Tours:#(s)
         cursor = conn.cursor()#(s)
         #Your code here
         cursor.execute("SELECT trip_id, start_location_name, end_location_name FROM trip WHERE end_location_name is NULL OR end_location_name = '' LIMIT 10;")
-        null_rows = cursor.fetchall()
-        og_rows = {row[0]:row[2] for row in null_rows}
+        null_rows_10 = cursor.fetchall()
+        first_10_ids = [row[0] for row in null_rows_10]
+        og_rows = {row[0]:row[2] for row in null_rows_10}
 
         result = []
+
+        cursor.execute("SELECT trip_id FROM trip WHERE end_location_name IS NULL OR end_location_name = '';")
+        all_missing_ids = [row[0] for row in cursor.fetchall()]
         
         # i
-        for trip_id, start, end in null_rows:
+        for trip_id in all_missing_ids:
             cursor.execute("UPDATE trip SET end_location_name = 'Stop St.' WHERE trip_id = ?;", (trip_id,))
         conn.commit()    
 
-        for trip_id, start, end in null_rows:
+        for trip_id, start, end in null_rows_10:
             cursor.execute("SELECT COUNT(*) FROM trip WHERE start_location_name = ? AND end_location_name = 'Stop St.';", (start,))
             count = cursor.fetchone()[0]
             result.append((trip_id, start, 'Stop St.', count))
 
-        for trip_id in og_rows:
-            cursor.execute("UPDATE trip SET end_location_name = NULL WHERE trip_id = ?;", (trip_id,))
+        for trip_id in all_missing_ids:
+            cursor.execute("UPDATE trip SET end_location_name = '' WHERE trip_id = ?;", (trip_id,))
         conn.commit()
 
         # ii
         cursor.execute("SELECT end_location_name FROM trip WHERE end_location_name IS NOT NULL AND end_location_name != '' GROUP BY end_location_name ORDER BY COUNT(*) DESC LIMIT 1;")
         freq = cursor.fetchone()[0]
 
-        for trip_id, start, end in null_rows:
+        for trip_id in all_missing_ids:
             cursor.execute("UPDATE trip SET end_location_name = ? WHERE trip_id = ?;", (freq,trip_id))
         conn.commit()
 
-        for trip_id, start, end in null_rows:
+        for trip_id, start, end in null_rows_10:
             cursor.execute("SELECT COUNT(*) FROM trip WHERE start_location_name = ? AND end_location_name = ?;", (start,freq))
             count = cursor.fetchone()[0]
             result.append((trip_id, start, freq, count))
             
-        for trip_id in og_rows:
-            cursor.execute("UPDATE trip SET end_location_name = NULL WHERE trip_id = ?;", (trip_id,))
+        for trip_id in all_missing_ids:
+            cursor.execute("UPDATE trip SET end_location_name = '' WHERE trip_id = ?;", (trip_id,))
         conn.commit()
 
         # iii
-        for trip_id, start, end in null_rows:
-            replace = start if start else freq
+        for trip_id, start, end in null_rows_10:
+            replace = start if start not in (None, '') else freq
             cursor.execute("UPDATE trip SET end_location_name = ? WHERE trip_id = ?;", (replace,trip_id))
         conn.commit()
 
-        for trip_id, start, end in null_rows:
-            replace = start if start else freq
+        for trip_id in set(all_missing_ids) - set(first_10_ids):
+            cursor.execute("""
+                SELECT start_location_name 
+                FROM trip 
+                WHERE trip_id = ?;
+            """, (trip_id,))
+            start_value = cursor.fetchone()[0]
+            replace_value = start_value if start_value not in (None, '') else freq
+            cursor.execute("UPDATE trip SET end_location_name = ? WHERE trip_id = ?;", (replace_value, trip_id))
+            
+        conn.commit()
+
+        for trip_id, start, end in null_rows_10:
+            replace = start if start not in (None, '') else freq
             cursor.execute("SELECT COUNT(*) FROM trip WHERE start_location_name = ? AND end_location_name = ?;", (start, replace))
             count = cursor.fetchone()[0]
             result.append((trip_id, start, replace, count))
@@ -126,7 +142,7 @@ class Tours:#(s)
             count = cursor.fetchone()[0]
             result.append((trip_id, freq, end, count))
         
-        return [('trip_id','start_location_name','end_location_name', 'pair_count')] + result
+        return [['trip_id','start_location_name','end_location_name', 'pair_count']] + result
         pass
 
     #(Question 3)
@@ -145,7 +161,7 @@ class Tours:#(s)
         cursor.execute("SELECT duration FROM trip LIMIT 5;")
         result = [row[0] for row in cursor.fetchall()]
 
-        return [['duration'],result]
+        return (['duration'],result)
         pass
         
 
@@ -167,7 +183,7 @@ class Tours:#(s)
         cursor.execute("SELECT month, trip_id, duration FROM trip LIMIT 5;")
         result = cursor.fetchall()
 
-        return [['month','trip_id','duration'], result]
+        return (['month','trip_id','duration'], result)
         pass
       
     #(Question 5)
@@ -240,7 +256,7 @@ class Tours:#(s)
         result = cursor.fetchall()
         
         # Format according to specification
-        return [count, ['trip_id', 'duration'], result]
+        return (count, ['trip_id', 'duration'], result)
         pass
 
     #(Question 6)
@@ -290,43 +306,31 @@ class Tours:#(s)
         #Your code here
         cursor.execute("""
             WITH valid_durations AS (
-                SELECT 
-                    duration,
-                    (
-                        CAST(substr(duration, 1, instr(duration, ':') - 1) AS INTEGER) * 3600 +
-                        CAST(substr(duration, instr(duration, ':') + 1, instr(substr(duration, instr(duration, ':') + 1), ':') - 1) AS INTEGER) * 60 +
-                        CAST(substr(duration, length(duration) - 1, 2) AS INTEGER)
-                    ) AS total_seconds
-                FROM trip
-                WHERE duration IS NOT NULL AND TRIM(duration) != ''
-            ),
-            ordered AS (
-                SELECT duration, total_seconds,
-                       ROW_NUMBER() OVER (ORDER BY total_seconds) AS rn,
-                       COUNT(*) OVER () AS total_count
-                FROM valid_durations
-            ),
-            median_row AS (
-                SELECT total_seconds
-                FROM ordered
-                WHERE rn = (total_count + 1) / 2
-            )
             SELECT 
-                printf(
-                    '%d:%02d:%02d',
-                    median_row.total_seconds / 3600,
-                    (median_row.total_seconds % 3600) / 60,
-                    median_row.total_seconds % 60
-                ) AS median_duration,
-                COUNT(t.duration)
-            FROM median_row
-            JOIN trip t ON (
-                (
-                    CAST(substr(t.duration, 1, instr(t.duration, ':') - 1) AS INTEGER) * 3600 +
-                    CAST(substr(t.duration, instr(t.duration, ':') + 1, instr(substr(t.duration, instr(t.duration, ':') + 1), ':') - 1) AS INTEGER) * 60 +
-                    CAST(substr(t.duration, length(t.duration) - 1, 2) AS INTEGER)
-                ) = median_row.total_seconds
-            );
+                duration,
+                (CAST(substr(duration, 1, instr(duration, ':') - 1) AS INTEGER) * 3600 +
+                 CAST(substr(duration, instr(duration, ':') + 1, instr(substr(duration, instr(duration, ':') + 1), ':') - 1) AS INTEGER) * 60 +
+                 CAST(substr(duration, length(duration) - 1, 2) AS INTEGER)
+                ) AS total_seconds
+            FROM trip
+            WHERE duration IS NOT NULL AND TRIM(duration) != ''
+        ),
+        ordered AS (
+            SELECT duration, total_seconds,
+                   ROW_NUMBER() OVER (ORDER BY total_seconds) AS rn,
+                   COUNT(*) OVER () AS total_count
+            FROM valid_durations
+        ),
+        median_row AS (
+            SELECT duration, total_seconds
+            FROM ordered
+            WHERE rn = CAST((total_count + 1) / 2 AS INTEGER) -- middle row for odd/even
+        )
+        SELECT 
+            median_row.duration,
+            COUNT(*)
+        FROM median_row
+        JOIN trip t ON t.duration = median_row.duration;
         """)
     
         result = cursor.fetchall()
@@ -344,20 +348,35 @@ class Tours:#(s)
         """
         cursor = conn.cursor()#(s)
         #Your code here
+        import math
+
+        # Register math functions with SQLite
+        conn.create_function("RADIANS", 1, lambda x: math.radians(x))
+        conn.create_function("SIN", 1, lambda x: math.sin(x))
+        conn.create_function("COS", 1, lambda x: math.cos(x))
+        conn.create_function("ASIN", 1, lambda x: math.asin(x))
+        conn.create_function("SQRT", 1, lambda x: math.sqrt(x))
+        conn.create_function("POWER", 2, lambda x, y: math.pow(x, y))
+        
         cursor.execute("""
             SELECT 
                 t.trip_id,
-                69.0 * (
-                    ABS(g_end.y - g_start.y) + ABS(g_end.x - g_start.x)
-                ) / 2.0 AS distance_miles
+                3959.0 * 2 * ASIN(
+                    SQRT(
+                        POWER(SIN((RADIANS(g_end.y) - RADIANS(g_start.y)) / 2), 2) +
+                        COS(RADIANS(g_start.y)) * COS(RADIANS(g_end.y)) *
+                        POWER(SIN((RADIANS(g_end.x) - RADIANS(g_start.x)) / 2), 2)
+                    )
+                )
             FROM trip t
             JOIN location l_start ON t.start_location_name = l_start.location_name
             JOIN geocode g_start ON l_start.geocode_id = g_start.geocode_id
             JOIN location l_end ON t.end_location_name = l_end.location_name
             JOIN geocode g_end ON l_end.geocode_id = g_end.geocode_id
-            WHERE t.trip_id IN (1637299, 1640777, 1652952);
+            WHERE t.trip_id IN (1637299, 1640777, 1652952)
+            ORDER BY t.trip_id;
         """)
-
+        
         result = cursor.fetchall()
         return result
         pass

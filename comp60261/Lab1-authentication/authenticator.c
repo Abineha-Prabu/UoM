@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <crypt.h>  // needed to use crypt()
 
-#define PASSWORD_HASH "$6$saltsalt$VEG7f44XjqiQeZMvzRMUwp4GKBUXea7E7.PoPcvtORyPuiLNY51CN..Qa6zZjz35Im4bEh.cEWLMiqAAsnsRn."// TODO complete here with the correct password in the
+#define PASSWORD_HASH "$6$saltsalt$d3b.HzPp/dT2xxWPhmHggpm4iVENbYhSs5TmwqargFvL6KCn7lZWxLb5VUqHZ1LooiAI9lX7KGKXhvUaxLQVN1"// TODO complete here with the correct password in the
                       // format expected by crypt:
                       // <hash function id>$<salt>$<hash of the correct password>
 

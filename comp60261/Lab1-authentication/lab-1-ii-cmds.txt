@@ -1,0 +1,44 @@
+5.
+mkpasswd --method=SHA-512 --salt=saltsalt w12890ap
+
+#define PASSWORD_HASH "$6$saltsalt$d3b.HzPp/dT2xxWPhmHggpm4iVENbYhSs5TmwqargFvL6KCn7lZWxLb5VUqHZ1LooiAI9lX7KGKXhvUaxLQVN1"
+
+
+void disable_echo() {
+    struct termios config;
+    tcgetattr(STDIN_FILENO, &config);  
+    config.c_lflag &= ~ECHO;           
+    tcsetattr(STDIN_FILENO, TCSANOW, &config); 
+}
+
+struct termios config;
+Creates a variable config to store terminal settings.
+
+tcgetattr(STDIN_FILENO, &config);
+Reads the current terminal configuration of the standard input (keyboard) into config.
+
+config.c_lflag &= ~ECHO;
+Clears the ECHO flag — meaning typed characters will no longer be displayed on screen.
+
+tcsetattr(STDIN_FILENO, TCSANOW, &config);
+Applies the new configuration immediately (TCSANOW = apply changes now).
+
+void enable_echo() {
+    struct termios config;
+    tcgetattr(STDIN_FILENO, &config);   
+    config.c_lflag |= ECHO;             
+    tcsetattr(STDIN_FILENO, TCSANOW, &config); 
+}
+
+Reads current terminal settings.
+
+Turns the ECHO flag back on (so characters typed afterward will show).
+
+Updates the terminal configuration immediately.
+
+    disable_echo();
+    char *r = fgets(attempt, sizeof(attempt), stdin);
+    enable_echo();
+    
+    printf("\n");
+

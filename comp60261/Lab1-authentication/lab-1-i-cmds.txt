@@ -1,0 +1,120 @@
+Q1
+1. chmod +x crackme01 
+2. ./crackme01 
+3. Please input your password: test Wrong password. 
+4. objdump -f crackme01 
+5. objdump -h crackme01 
+6. objdump --disassemble -j .text crackme01 
+7. gdb crackme01 
+8. gef> br main 
+9. run 
+10. strcmp@plt ( $rdi = 0x00007fffffffd990 → 0x00000a7878787878 ("xxxxx\n"?), $rsi = 0x0000555555558028 → "password-here", ... ) 
+11. Please input your password: password-here Authentication successful!
+
+Q2
+It prompts: Please input your password:
+
+It reads a line with fgets(), strips the trailing \n (via strcspn() and setting the \n to \0).
+
+It calls atoi() on that cleaned string to get an integer.
+
+It compares that integer against a 32-bit value embedded in the binary at address 0x404038.
+
+If they match it prints “Authentication successful!”, otherwise “Wrong password.”
+
+The binary also uses a stack canary (stack protector) to detect stack corruption.
+
+You ran these commands (paraphrased):
+
+ni — stepped; the inferior exited normally (process ended).
+
+x/s 0x404038 → output: 0x404038: "\200\217"
+
+x/s tried to print a C string at that address. It printed two non-printable bytes displayed as \200 and \217 (these are octal escapes for byte values).
+
+That means the first two bytes are 0x80 and 0x8F (0x80 → octal 200, 0x8F → octal 217).
+
+x/wx 0x404038 → output: 0x404038: 0x00008f80
+
+x/wx prints a 4-byte word in hex. The word there is 0x00008F80.
+
+x/wd 0x404038 → output: 0x404038: 36736
+
+x/wd prints that same 4-byte word as a signed decimal: 36736.
+
+Memory near 0x404038 (four bytes) is (in order):
+[0x404038] = 0x80
+[0x404039] = 0x8F
+[0x40403A] = 0x00
+[0x40403B] = 0x00
+On x86_64 the architecture is little-endian, so the 32-bit word value is:
+0x00 0x00 0x8F 0x80  (big-endian view)
+→ stored little-endian as 0x80 0x8F 0x00 0x00
+→ assembled value = 0x00008F80
+
+Convert hex 0x8F80 to decimal:
+0x8F80 = 8*16^3 + 15*16^2 + 8*16^1 + 0
+       = 8*4096 + 15*256 + 8*16 + 0
+       = 32768 + 3840 + 128
+       = 36736
+
+Q3. same
+
+Q4. if (atoi(buf) != 2 * *(int32_t *)0x404038) …
+
+gef➤  ni
+[Inferior 1 (process 5015) exited normally]
+gef➤  ni
+The program is not being run.
+gef➤  x/4xb 0x404038
+0x404038:	0xab	0xe6	0x00	0x00
+gef➤  x/wx 0x404038
+0x404038:	0x0000e6ab
+gef➤  x/wd 0x404038
+0x404038:	59051
+gef➤  x/s 0x404038
+0x404038:	"\253", <incomplete sequence \346>
+gef➤  Quit
+gef➤  
+
+59051 * 2 = 118102
+
+Q5.
+# show as decimal 32-bit integer
+(gdb) x/wd 0x404038
+
+# show as hex word
+(gdb) x/wx 0x404038
+
+# show raw 4 bytes (endianness)
+(gdb) x/4xb 0x404038
+
+# compute/print directly
+(gdb) p/d *(int32_t*)0x404038
+(gdb) p/x *(int32_t*)0x404038
+
+Q6.
+112 -> 'p'
+101 -> 'e'
+110 -> 'n'
+101 -> 'e'
+116 -> 't'
+114 -> 'r'
+97  -> 'a'
+116 -> 't'
+105 -> 'i'
+111 -> 'o'
+110 -> 'n'
+0   -> '\0'  (string terminator)
+
+gdb -q crackme01
+# or: gef -q crackme01
+(gdb) break fgets
+(gdb) run
+# the program will stop at fgets (after set_password() has executed and after puts)
+(gdb) x/s 0x404060
+# optionally: x/12bx 0x404060
+(gdb) continue
+# when prompted, type the password you saw and press Enter
+
+

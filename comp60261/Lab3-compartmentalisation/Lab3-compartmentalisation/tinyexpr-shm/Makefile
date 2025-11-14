@@ -6,7 +6,6 @@ BINS = example example2 test-suite benchmark shm-lib
 
 all: shm-lib $(BINS)
 
-# Compile main programs
 example: example.c tinyexpr.c shm-main.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
@@ -19,7 +18,6 @@ test-suite: test-suite.c tinyexpr.c shm-main.c
 benchmark: benchmark.c tinyexpr.c shm-main.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-# Compile library compartment
 shm-lib: shm-lib.c tinyexpr.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 

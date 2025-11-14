@@ -1,9 +1,9 @@
 #ifndef CUSTOM_TINYEXPR_H
 #define CUSTOM_TINYEXPR_H
 
-#define _POSIX_C_SOURCE 200112L  // <<< ensure barriers are defined
+#define _POSIX_C_SOURCE 200112L  
 
-#include <pthread.h>   // must be **before** any struct using pthread_barrier_t
+#include <pthread.h>   
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +20,16 @@ typedef struct {
     int error;                       /* error code */
 } te_shm_t;
 
-double te_interp(const char *expression, int *error);
+/* Initialization / cleanup */
+void te_init_shm(void);
+void te_cleanup_shm(void);
+
+/* Expression evaluation via SHM */
+double te_interp_shm(const char *expression, int *error);
+ 
+#ifndef SHM_LIB_BUILD
+#define te_interp te_interp_shm
+#endif
 
 #endif /* CUSTOM_TINYEXPR_H */
 

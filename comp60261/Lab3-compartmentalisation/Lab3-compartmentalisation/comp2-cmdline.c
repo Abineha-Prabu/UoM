@@ -33,6 +33,8 @@ int main(int argc, char **argv) {
         .sin_port = htons(12345),
         .sin_addr.s_addr = INADDR_ANY
     };
+    
+    printf(" %s heartbeat\n", heartbeat);
 
     if (bind(server, (struct sockaddr*)&addr, sizeof(addr)) < 0) { perror("bind"); return 1; }
     if (listen(server, 1) < 0) { perror("listen"); return 1; }

@@ -23,5 +23,6 @@ example: example.c te_client.c
 example2: example2.c te_client.c
 	$(CC) $(CCFLAGS) -o $@ $^ $(LFLAGS)
 
-clean:a
-	rm -f *.o *.exe $(BINS) /tmp/te_param.pipe /tmp/te_result.pipe
+clean:
+	rm -f *.o *.exe $(BINS)
+	rm -f /tmp/te_param.pipe /tmp/te_result.pipe
